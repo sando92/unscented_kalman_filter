@@ -2,6 +2,7 @@
 #include "Eigen/Dense"
 
 #include <iostream>
+#include <math.h>
 
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
@@ -130,18 +131,18 @@ void UKF::UpdateLidar(const MeasurementPackage &meas_package) {
             for (int i = 0; i < 2 * n_aug_ + 1; ++i) {  // 2n+1 sigma points
                 // residual
                 VectorXd z_diff = Zsig_lidar_.col(i) - z_lidar_pred_;
-                NormalizeAngle(&z_diff(1));
+                z_diff(1) = ConstrainAngle(z_diff(1));
 
                 // state difference
                 VectorXd x_diff = Xsig_pred_.col(i) - x_;
-                NormalizeAngle(&x_diff(3));
+                x_diff(3) = ConstrainAngle(x_diff(3));
 
                 Tc += weights_(i) * x_diff * z_diff.transpose();
             }
 
             // residual
             VectorXd z_diff = meas_package.raw_measurements_ - z_lidar_pred_;
-            NormalizeAngle(&z_diff(1));
+            z_diff(1) = ConstrainAngle(z_diff(1));
 
             // NIS calculation
             if (nis_check_) {
@@ -193,18 +194,18 @@ void UKF::UpdateRadar(const MeasurementPackage &meas_package) {
             for (int i = 0; i < 2 * n_aug_ + 1; ++i) {  // 2n+1 sigma points
                 // residual
                 VectorXd z_diff = Zsig_radar_.col(i) - z_radar_pred_;
-                NormalizeAngle(&z_diff(1));
+                z_diff(1) = ConstrainAngle(z_diff(1));
 
                 // state difference
                 VectorXd x_diff = Xsig_pred_.col(i) - x_;
-                NormalizeAngle(&x_diff(3));
+                x_diff(3) = ConstrainAngle(x_diff(3));
 
                 Tc += weights_(i) * x_diff * z_diff.transpose();
             }
 
             // residual
             VectorXd z_diff = meas_package.raw_measurements_ - z_radar_pred_;
-            NormalizeAngle(&z_diff(1));
+            z_diff(1) = ConstrainAngle(z_diff(1));
 
             // NIS calculation
             if (nis_check_) {
@@ -369,7 +370,7 @@ void UKF::PredictMeanAndCovariance() {
     for (int i = 0; i < 2 * n_aug_ + 1; ++i) {  // iterate over sigma points
     // state difference
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
-    NormalizeAngle(&x_diff(3));
+    x_diff(3) = ConstrainAngle(x_diff(3));
 
     P_ += weights_(i) * x_diff * x_diff.transpose() ;
     }
@@ -408,7 +409,7 @@ void UKF::PredictLidarMeasurement() {
         // residual
         VectorXd z_diff = Zsig_lidar_.col(i) - z_lidar_pred_;
 
-        NormalizeAngle(&z_diff(1));
+        z_diff(1) = ConstrainAngle(z_diff(1));
 
         S_lidar_ += weights_(i) * z_diff * z_diff.transpose();
     }
@@ -450,7 +451,7 @@ void UKF::PredictRadarMeasurement() {
     // residual
     VectorXd z_diff = Zsig_radar_.col(i) - z_radar_pred_;
 
-    NormalizeAngle(&z_diff(1));
+    z_diff(1) = ConstrainAngle(z_diff(1));
 
     S_radar_ += weights_(i) * z_diff * z_diff.transpose();
     }
@@ -489,7 +490,9 @@ void UKF::Prediction(double delta_t) {
 /**
  *  Normalize angle between [-PI; PI]
  */
-void UKF::NormalizeAngle(double* angle) {
-    while (*angle >  M_PI) *angle -= 2. * M_PI;
-    while (*angle < -M_PI) *angle += 2. * M_PI;
+double UKF::ConstrainAngle(double angle) {
+    angle = fmod(angle + M_PI/2, M_PI);
+    if (angle < 0)
+        angle += M_PI;
+    return angle -= M_PI/2;
 }

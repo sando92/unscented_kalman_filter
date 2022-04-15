@@ -48,8 +48,11 @@ class UKF {
    */
   void UpdateRadar(const MeasurementPackage &meas_package);
 
-
-  static void NormalizeAngle(double* angle);
+    /**
+    * Constrains given angle between -pi and pi.
+    * @param angle The angle to be constrained
+    */
+  static double ConstrainAngle(double angle);
 
   bool debug_;
 
