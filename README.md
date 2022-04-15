@@ -38,6 +38,7 @@ For example, if we look at the lidar sensor (2 dof), 95% of NIS values must be l
 
 # Dependencies
 
+- [Eigen](https://eigen.tuxfamily.org/dox/GettingStarted.html)
 - [gnuplot](https://sourceforge.net/p/gnuplot/gnuplot-main/ci/master/tree/)
 - [gnuplot-iostream](https://github.com/dstahlke/gnuplot-iostream)
 
