@@ -23,10 +23,27 @@ class UKF {
    */
   void ProcessMeasurement(const MeasurementPackage &meas_package);
 
+  /**
+   * CreateAugmentedSigmaPoints Creates augmented sigma points
+   */
   void CreateAugmentedSigmaPoints();
+
+/**
+   * SigmaPointPrediction Predicts sigma points
+   * @param delta_t Time between k and k+1 in s
+   */
   void SigmaPointPrediction(double delta_t);
+
+    /**
+   * PredictMeanAndCovariance Predicts the state, and the state covariance
+   * matrix
+   */
   void PredictMeanAndCovariance();
-  void PredictLidarMeasurement();
+
+  /**
+   * PredictRadarMeasurement Predicts radar measurement, tranforms sigma points into
+   * radar measurement space to complete the update in a second step.
+   */
   void PredictRadarMeasurement();
 
   /**
@@ -133,17 +150,10 @@ class UKF {
 
   // Lidar dof
   int n_lidar_;
-  // mean predicted lidar measurement
-  Eigen::VectorXd z_lidar_pred_;
-
+  // measurement function
+  Eigen::MatrixXd H_lidar_;
   // lidar noise covariance matrix
   Eigen::MatrixXd R_lidar_;
-  // lidar measurement covariance matrix
-  Eigen::MatrixXd S_lidar_;
-
-  // sigma points matrix in lidar measurement space
-  Eigen::MatrixXd Zsig_lidar_;
-
 
   // boolean to choose to do or not consistency check
   bool nis_check_;

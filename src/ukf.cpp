@@ -83,6 +83,7 @@ UKF::UKF() {
     weights_(i) = weight;
     }
 
+    // Radar space size, dof
     n_radar_ = 3;
     // mean predicted measurement
     z_radar_pred_ = VectorXd::Zero(n_radar_);
@@ -97,18 +98,14 @@ UKF::UKF() {
     // create matrix for sigma points in radar measurement space
     Zsig_radar_ = MatrixXd::Zero(n_radar_, 2 * n_aug_ + 1);
 
+    // Lidar space size, dof
     n_lidar_ = 2;
-    // mean predicted measurement
-    z_lidar_pred_ = VectorXd::Zero(n_lidar_);
-
+    // Lidar measurement function
+    H_lidar_ = MatrixXd::Identity(n_lidar_, n_x_);
+    // lidar noise covariance matrix
     R_lidar_ = MatrixXd(n_lidar_, n_lidar_);
     R_lidar_ <<  std_laspx_ * std_laspx_, 0,
             0, std_laspy_ * std_laspy_;
-    // measurement covariance matrix S
-    S_lidar_ = MatrixXd::Identity(n_lidar_, n_lidar_);
-
-    // create matrix for sigma points in lidar measurement space
-    Zsig_lidar_ = MatrixXd::Zero(n_lidar_, 2 * n_aug_ + 1);
 
     std::cout << "UKF init done." << std::endl;
 }
@@ -116,7 +113,7 @@ UKF::UKF() {
 UKF::~UKF() {}
 
 /**
- * Update UKF from lidar measurement
+ * Update state and state covariance matrix from lidar measurement
  */
 void UKF::UpdateLidar(const MeasurementPackage &meas_package) {
     if (debug_)
@@ -124,40 +121,13 @@ void UKF::UpdateLidar(const MeasurementPackage &meas_package) {
 
     if (is_initialized_) {
         if (use_laser_) {
-            // create matrix for cross correlation Tc
-            MatrixXd Tc = MatrixXd::Zero(n_x_, n_lidar_);
-            Tc.fill(0.0);
-            // calculate cross correlation matrix
-            for (int i = 0; i < 2 * n_aug_ + 1; ++i) {  // 2n+1 sigma points
-                // residual
-                VectorXd z_diff = Zsig_lidar_.col(i) - z_lidar_pred_;
-                z_diff(1) = ConstrainAngle(z_diff(1));
+            MatrixXd S = H_lidar_ * P_ * H_lidar_.transpose() + R_lidar_;
+            MatrixXd K = P_ * H_lidar_.transpose() * S.inverse();
 
-                // state difference
-                VectorXd x_diff = Xsig_pred_.col(i) - x_;
-                x_diff(3) = ConstrainAngle(x_diff(3));
-
-                Tc += weights_(i) * x_diff * z_diff.transpose();
-            }
-
-            // residual
-            VectorXd z_diff = meas_package.raw_measurements_ - z_lidar_pred_;
-            z_diff(1) = ConstrainAngle(z_diff(1));
-
-            // NIS calculation
-            if (nis_check_) {
-                double nis = z_diff.transpose() * S_lidar_.inverse() * z_diff;
-                if (debug_)
-                    std::cout << "NIS is: " << nis << std::endl;
-                nis_lidar_.push_back(nis); 
-            }
-
-            // Kalman gain K;
-            MatrixXd K = Tc * S_lidar_.inverse();
-
-            // update state mean and covariance matrix
+            VectorXd z_diff = meas_package.raw_measurements_ - H_lidar_ * x_;
+            
             x_ += K * z_diff;
-            P_ -= K * S_lidar_ * K.transpose();
+            P_ -= K * S * K.transpose();
         }
     } else {
         x_(0) = meas_package.raw_measurements_(0);
@@ -383,42 +353,6 @@ void UKF::PredictMeanAndCovariance() {
 }
 
 /**
- * Predict lidar measurement,
- *      Transform sigma points into lidar measurement space
- *      Caculate mean z_lidar_pred_
- *      Calculate corresponding covariance matrix S_lidar_
- */
-void UKF::PredictLidarMeasurement() {
-    // transform sigma points into measurement space
-    Zsig_lidar_.fill(0.0);
-    z_lidar_pred_.fill(0.0);
-    for (int i = 0; i < (2 * n_aug_ + 1); ++i) {  // 2n+1 sigma points
-        // extract values for better readability
-        double p_x = Xsig_pred_(0,i);
-        double p_y = Xsig_pred_(1,i);
-
-        // measurement model
-        Zsig_lidar_(0,i) = p_x;
-        Zsig_lidar_(1,i) = p_y;
-        
-        z_lidar_pred_ += weights_(i) * Zsig_lidar_.col(i);
-    }
-
-    S_lidar_.fill(0.0);
-    for (int i = 0; i < (2 * n_aug_ + 1); ++i) {  // 2n+1 sigma points
-        // residual
-        VectorXd z_diff = Zsig_lidar_.col(i) - z_lidar_pred_;
-
-        z_diff(1) = ConstrainAngle(z_diff(1));
-
-        S_lidar_ += weights_(i) * z_diff * z_diff.transpose();
-    }
-
-    // add measurement noise covariance matrix
-    S_lidar_ += R_lidar_;
-}
-
-/**
  * Predict radar measurement,
  *      Transform sigma points into radar measurement space
  *      Calculate mean z_radar_pred_
@@ -467,8 +401,6 @@ void UKF::PredictRadarMeasurement() {
  *      PredictMeanAndCovariance()
  *      
  *      PredictRadarMeasurement()
- *      PredictLidarMeasurement()
- * 
  */
 void UKF::Prediction(double delta_t) {
     if (is_initialized_) {
@@ -482,8 +414,7 @@ void UKF::Prediction(double delta_t) {
 
         if (use_radar_)
             PredictRadarMeasurement();
-        if (use_laser_)
-            PredictLidarMeasurement();
+        // we only predict radar measurement because lidar measurement could be processed linearly (simple KF)
   }
 }
 
